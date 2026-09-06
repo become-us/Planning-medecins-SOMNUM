@@ -16,14 +16,6 @@ function checkPageAccess() {
   }
 }
 
-if (sessionStorage.getItem("smd_access") === "1") {
-  document.getElementById("access-gate").style.display = "none";
-  document.getElementById("app-content").style.display = "block";
-} else {
-  document.getElementById("access-code-input").focus();
-}
-
-
 const PERIODS = [
   { key: "matin", label: "Matin" },
   { key: "apres-midi", label: "Après-midi" }
@@ -461,3 +453,17 @@ function exportGridPDF() {
 
   doc.save(`planning-medecin-somnum-${state.year}-${pad(state.month + 1)}.pdf`);
 }
+
+// ---------- Init ----------
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("access-code-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") checkPageAccess();
+  });
+  if (sessionStorage.getItem("smd_access") === "1") {
+    document.getElementById("access-gate").style.display = "none";
+    document.getElementById("app-content").style.display = "block";
+    boot();
+  } else {
+    document.getElementById("access-code-input").focus();
+  }
+});
