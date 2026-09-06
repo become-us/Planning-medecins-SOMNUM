@@ -489,37 +489,67 @@ function exportGridPDF() {
     return row;
   });
 
+  // Hauteur de cellule fixe pour avoir de la place pour 2 demi-cases
+  const CELL_H = 10;
+
   doc.autoTable({
     head, body,
     startY: 20,
-    styles: { fontSize: 6, cellPadding: 1, halign: "center", valign: "middle" },
-    columnStyles: { 0: { halign: "left", cellWidth: 30 } },
+    styles: { fontSize: 5, cellPadding: 0, halign: "center", valign: "middle", minCellHeight: CELL_H },
+    columnStyles: { 0: { halign: "left", cellWidth: 30, fontSize: 6 } },
     headStyles: { fillColor: [40, 40, 40], textColor: [255,255,255], fontStyle: "bold" },
     didParseCell: function(data) {
+      // Weekend vide : fond gris clair
+      if (data.section !== "body" || data.column.index === 0) return;
+      const day = data.column.index;
+      if (isWeekend(state.year, state.month, day)) {
+        data.cell.styles.fillColor = [235, 235, 235];
+      }
+      // On efface le texte : on dessinera les couleurs dans didDrawCell
+      data.cell.text = [];
+    },
+    didDrawCell: function(data) {
       if (data.section !== "body" || data.column.index === 0) return;
       const day = data.column.index;
       const doctor = doctors[data.row.index];
       if (!doctor) return;
       const date = isoDate(state.year, state.month, day);
-      const matin = findVacation(doctor.id, date, "matin");
-      const aprem = findVacation(doctor.id, date, "apres-midi");
-      const dominant = matin || aprem;
-      if (!dominant) {
-        if (isWeekend(state.year, state.month, day)) {
-          data.cell.styles.fillColor = [220, 220, 220];
+      const matin   = findVacation(doctor.id, date, "matin");
+      const aprem   = findVacation(doctor.id, date, "apres-midi");
+      const x = data.cell.x;
+      const y = data.cell.y;
+      const w = data.cell.width;
+      const h = data.cell.height;
+      const halfH = h / 2;
+
+      function drawHalf(vac, yOffset) {
+        if (!vac) return;
+        let rgb;
+        if (vac.is_absence) {
+          rgb = [20, 24, 28];
+        } else {
+          const site = siteById(vac.site_id);
+          if (!site) return;
+          rgb = hexToRgb(site.color);
         }
-        return;
-      }
-      if (dominant.is_absence) {
-        data.cell.styles.fillColor = [20, 24, 28];
-        data.cell.styles.textColor = [255, 255, 255];
-      } else {
-        const site = siteById(dominant.site_id);
-        if (site) {
-          data.cell.styles.fillColor = hexToRgb(site.color);
-          data.cell.styles.textColor = [255, 255, 255];
+        doc.setFillColor(rgb[0], rgb[1], rgb[2]);
+        doc.rect(x, y + yOffset, w, halfH, "F");
+        // Abréviation en blanc
+        const abbr = vac.is_absence ? "ABS" : (siteById(vac.site_id) ? siteById(vac.site_id).name.slice(0,3).toUpperCase() : "");
+        if (abbr) {
+          doc.setTextColor(255, 255, 255);
+          doc.setFontSize(4.5);
+          doc.text(abbr, x + w / 2, y + yOffset + halfH / 2 + 1.5, { align: "center" });
         }
       }
+
+      drawHalf(matin, 0);
+      drawHalf(aprem, halfH);
+
+      // Rebord de la cellule
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.1);
+      doc.rect(x, y, w, h, "S");
     }
   });
 
