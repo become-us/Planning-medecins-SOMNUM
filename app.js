@@ -396,33 +396,69 @@ async function deleteSite(id) {
 // ---------- Stats ----------
 function renderStats() {
   const container = document.getElementById("stats-grid");
-  const counts = {};
-  for (const site of state.sites) counts[site.id] = 0;
+  // Comptages par site
+  const bySite = {};
+  for (const site of state.sites) bySite[site.id] = 0;
   let absenceCount = 0;
-
   for (const vac of state.vacations) {
     if (vac.is_absence) absenceCount++;
-    else if (vac.site_id && counts.hasOwnProperty(vac.site_id)) counts[vac.site_id]++;
+    else if (vac.site_id && bySite.hasOwnProperty(vac.site_id)) bySite[vac.site_id]++;
   }
 
-  let html = "";
-  for (const site of state.sites) {
-    html += `
-      <div class="stat-card">
-        <p class="stat-label"><span class="legend-swatch" style="background:${site.color}"></span>${escapeHtml(site.name)}</p>
-        <p class="stat-value">${counts[site.id]}</p>
-      </div>`;
+  // Comptages par médecin : { doctorId: { siteId: count, absence: count } }
+  const byDoctor = {};
+  for (const d of state.doctors) byDoctor[d.id] = { _absence: 0, _total: 0 };
+  for (const vac of state.vacations) {
+    if (!byDoctor[vac.doctor_id]) continue;
+    if (vac.is_absence) {
+      byDoctor[vac.doctor_id]._absence++;
+    } else if (vac.site_id) {
+      byDoctor[vac.doctor_id][vac.site_id] = (byDoctor[vac.doctor_id][vac.site_id] || 0) + 1;
+    }
+    byDoctor[vac.doctor_id]._total++;
   }
-  html += `
-    <div class="stat-card">
-      <p class="stat-label"><span class="legend-swatch" style="background:#14181c"></span>Absences</p>
-      <p class="stat-value">${absenceCount}</p>
+
+  let html = `<div class="stat-section-title">Vacations par site</div><div class="stat-row">`;
+  for (const site of state.sites) {
+    html += `<div class="stat-card">
+      <p class="stat-label"><span class="legend-swatch" style="background:${site.color}"></span>${escapeHtml(site.name)}</p>
+      <p class="stat-value">${bySite[site.id]}</p>
     </div>`;
+  }
+  html += `<div class="stat-card">
+    <p class="stat-label"><span class="legend-swatch" style="background:#14181c"></span>Absences</p>
+    <p class="stat-value">${absenceCount}</p>
+  </div></div>`;
+
+  html += `<div class="stat-section-title" style="margin-top:24px;">Vacations par médecin</div>`;
+  html += `<div class="stat-table-wrap"><table class="stat-table">
+    <thead><tr>
+      <th>Médecin</th>
+      ${state.sites.map(s => `<th><span class="legend-swatch" style="background:${s.color};vertical-align:middle;"></span>${escapeHtml(s.name)}</th>`).join("")}
+      <th>Absences</th>
+      <th>Total</th>
+    </tr></thead>
+    <tbody>`;
+  for (const d of state.doctors) {
+    const row = byDoctor[d.id] || {};
+    html += `<tr>
+      <td class="stat-doctor-name">${escapeHtml(d.name)}</td>
+      ${state.sites.map(s => `<td>${row[s.id] || 0}</td>`).join("")}
+      <td>${row._absence || 0}</td>
+      <td><strong>${row._total || 0}</strong></td>
+    </tr>`;
+  }
+  html += `</tbody></table></div>`;
 
   container.innerHTML = html;
 }
 
 // ---------- PDF export ----------
+function hexToRgb(hex) {
+  const h = hex.replace("#", "");
+  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+}
+
 function exportGridPDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: "landscape" });
@@ -431,7 +467,9 @@ function exportGridPDF() {
   const doctors = state.doctors.filter(d => d.name.toLowerCase().includes(query));
 
   doc.setFontSize(14);
+  doc.setFont(undefined, "bold");
   doc.text(`Planning médecin SOMNUM — ${MONTH_NAMES[state.month]} ${state.year}`, 14, 14);
+  doc.setFont(undefined, "normal");
 
   const head = [["Médecin", ...Array.from({ length: nDays }, (_, i) => String(i + 1))]];
   const body = doctors.map(doctor => {
@@ -454,9 +492,56 @@ function exportGridPDF() {
   doc.autoTable({
     head, body,
     startY: 20,
-    styles: { fontSize: 6, cellPadding: 1, halign: "center" },
-    columnStyles: { 0: { halign: "left", cellWidth: 30 } }
+    styles: { fontSize: 6, cellPadding: 1, halign: "center", valign: "middle" },
+    columnStyles: { 0: { halign: "left", cellWidth: 30 } },
+    headStyles: { fillColor: [40, 40, 40], textColor: [255,255,255], fontStyle: "bold" },
+    didParseCell: function(data) {
+      if (data.section !== "body" || data.column.index === 0) return;
+      const day = data.column.index;
+      const doctor = doctors[data.row.index];
+      if (!doctor) return;
+      const date = isoDate(state.year, state.month, day);
+      const matin = findVacation(doctor.id, date, "matin");
+      const aprem = findVacation(doctor.id, date, "apres-midi");
+      const dominant = matin || aprem;
+      if (!dominant) {
+        if (isWeekend(state.year, state.month, day)) {
+          data.cell.styles.fillColor = [220, 220, 220];
+        }
+        return;
+      }
+      if (dominant.is_absence) {
+        data.cell.styles.fillColor = [20, 24, 28];
+        data.cell.styles.textColor = [255, 255, 255];
+      } else {
+        const site = siteById(dominant.site_id);
+        if (site) {
+          data.cell.styles.fillColor = hexToRgb(site.color);
+          data.cell.styles.textColor = [255, 255, 255];
+        }
+      }
+    }
   });
+
+  // --- Légende ---
+  let legendY = doc.lastAutoTable.finalY + 10;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  doc.setFontSize(8);
+  doc.setFont(undefined, "bold");
+  doc.setTextColor(0, 0, 0);
+  doc.text("Légende :", 14, legendY);
+  doc.setFont(undefined, "normal");
+  let lx = 38;
+  const items = [...state.sites.map(s => ({ name: s.name, color: s.color })), { name: "Absence", color: "#14181c" }];
+  for (const item of items) {
+    const rgb = hexToRgb(item.color);
+    doc.setFillColor(rgb[0], rgb[1], rgb[2]);
+    doc.roundedRect(lx, legendY - 4.5, 6, 5, 1, 1, "F");
+    doc.setTextColor(0, 0, 0);
+    doc.text(item.name, lx + 8, legendY);
+    lx += doc.getTextWidth(item.name) + 18;
+    if (lx > pageWidth - 40) { lx = 38; legendY += 9; }
+  }
 
   doc.save(`planning-medecin-somnum-${state.year}-${pad(state.month + 1)}.pdf`);
 }
