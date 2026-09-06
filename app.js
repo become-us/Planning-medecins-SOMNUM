@@ -418,7 +418,7 @@ function renderStats() {
     byDoctor[vac.doctor_id]._total++;
   }
 
-  let html = `<div class="stat-section-title">Vacations par site</div><div class="stat-row">`;
+  let html = `<div class="stat-section-title">Vacations par site <span class="stat-note">(1 vacation = 0,5J)</span></div><div class="stat-row">`;
   for (const site of state.sites) {
     html += `<div class="stat-card">
       <p class="stat-label"><span class="legend-swatch" style="background:${site.color}"></span>${escapeHtml(site.name)}</p>
@@ -430,7 +430,7 @@ function renderStats() {
     <p class="stat-value">${absenceCount}</p>
   </div></div>`;
 
-  html += `<div class="stat-section-title" style="margin-top:24px;">Vacations par médecin</div>`;
+  html += `<div class="stat-section-title" style="margin-top:24px;">Vacations par médecin <span class="stat-note">(1 vacation = 0,5J)</span></div>`;
   html += `<div class="stat-table-wrap"><table class="stat-table">
     <thead><tr>
       <th>Médecin</th>
