@@ -37,9 +37,9 @@
 
 <nav class="tabs">
   <button class="tab active" data-view="grille" onclick="showView('grille')">Grille</button>
-  <button class="tab" data-view="medecins" onclick="showView('medecins')">Médecins</button>
-  <button class="tab" data-view="sites" onclick="showView('sites')">Sites</button>
   <button class="tab" data-view="stats" onclick="showView('stats')">Statistiques</button>
+  <button class="tab admin-only" data-view="medecins" onclick="showView('medecins')" style="display:none;">Médecins</button>
+  <button class="tab admin-only" data-view="sites" onclick="showView('sites')" style="display:none;">Sites</button>
 </nav>
 
 <!-- ===== Vue Grille ===== -->

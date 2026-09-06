@@ -109,6 +109,13 @@ function toggleAdmin() {
   }
   state.isAdmin = !state.isAdmin;
   document.getElementById("admin-switch").classList.toggle("on", state.isAdmin);
+  document.querySelectorAll(".admin-only").forEach(el => {
+    el.style.display = state.isAdmin ? "inline-flex" : "none";
+  });
+  if (!state.isAdmin && (state.currentView === "medecins" || state.currentView === "sites")) {
+    showView("grille");
+    return;
+  }
   renderAll();
 }
 
