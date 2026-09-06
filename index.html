@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Planning médecin SOMNUM</title>
+<link rel="stylesheet" href="style.css" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+
+<div id="access-gate" class="overlay" style="align-items:center;">
+  <div class="picker" style="border-radius:16px; max-width:340px;">
+    <p class="picker-title">Accès protégé</p>
+    <p class="picker-sub">Entrez le code pour accéder au planning.</p>
+    <input type="password" id="access-code-input" class="search-input" style="width:100%; margin-bottom:12px;" placeholder="Code d'accès" />
+    <p id="access-error" style="color:var(--danger); font-size:13px; display:none; margin:0 0 10px;">Code incorrect.</p>
+    <button class="btn btn-primary" style="width:100%;" onclick="checkPageAccess()">Valider</button>
+  </div>
+</div>
+
+<div id="app-content" style="display:none;">
+
+<header class="app-header">
+  <img class="app-logo" src="logo.png" alt="Somnum" />
+  <p class="app-title">Planning médecin SOMNUM</p>
+  <a class="rh-link" href="https://VOTRE-LIEN-SOMNUM-RH.example.com" target="_blank" rel="noopener">Somnum RH</a>
+  <div class="admin-toggle">
+    <span>Vue admin</span>
+    <button id="admin-switch" class="switch" onclick="toggleAdmin()"></button>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-view="grille" onclick="showView('grille')">Grille</button>
+  <button class="tab" data-view="medecins" onclick="showView('medecins')">Médecins</button>
+  <button class="tab" data-view="sites" onclick="showView('sites')">Sites</button>
+  <button class="tab" data-view="stats" onclick="showView('stats')">Statistiques</button>
+</nav>
+
+<!-- ===== Vue Grille ===== -->
+<section id="view-grille" class="view active">
+  <div class="toolbar">
+    <input class="search-input" id="search-input" type="text" placeholder="Rechercher un médecin" oninput="renderGrid()" />
+    <div class="month-nav">
+      <button onclick="changeMonth(-1)">&lsaquo;</button>
+      <span class="month-label" id="month-label">-</span>
+      <button onclick="changeMonth(1)">&rsaquo;</button>
+    </div>
+    <button class="btn" onclick="exportGridPDF()">Exporter en PDF</button>
+  </div>
+
+  <div class="grid-scroll">
+    <table class="grid" id="grid-table">
+      <thead id="grid-thead"></thead>
+      <tbody id="grid-tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="legend" id="legend"></div>
+</section>
+
+<!-- ===== Vue Médecins (admin) ===== -->
+<section id="view-medecins" class="view">
+  <div class="admin-panel">
+    <h2>Médecins</h2>
+    <div id="doctors-list"></div>
+    <div class="form-row cols-3">
+      <input type="text" id="new-doctor-name" placeholder="Nom" />
+      <input type="text" id="new-doctor-status" placeholder="Statut (ex : titulaire)" />
+      <input type="text" id="new-doctor-presence" placeholder="Temps de présence" />
+    </div>
+    <div class="form-row">
+      <button class="btn btn-primary" onclick="addDoctor()">Ajouter le médecin</button>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Vue Sites (admin) ===== -->
+<section id="view-sites" class="view">
+  <div class="admin-panel">
+    <h2>Sites et couleurs</h2>
+    <p class="record-sub" style="margin-bottom:12px;">L'absence est toujours représentée en noir et n'a pas besoin d'être ajoutée ici.</p>
+    <div id="sites-list"></div>
+    <div class="form-row cols-3">
+      <input type="text" id="new-site-name" placeholder="Nom du site" />
+      <input type="color" id="new-site-color" value="#1d6f5c" />
+      <button class="btn btn-primary" onclick="addSite()">Ajouter le site</button>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Vue Statistiques ===== -->
+<section id="view-stats" class="view">
+  <div class="toolbar">
+    <div class="month-nav">
+      <button onclick="changeMonth(-1)">&lsaquo;</button>
+      <span class="month-label" id="month-label-stats">-</span>
+      <button onclick="changeMonth(1)">&rsaquo;</button>
+    </div>
+  </div>
+  <div class="stat-grid" id="stats-grid"></div>
+</section>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</div>
+
+<script>
+  document.getElementById("access-code-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") checkPageAccess();
+  });
+</script>
+
+</body>
+</html>
