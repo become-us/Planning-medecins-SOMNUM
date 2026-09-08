@@ -452,4 +452,5 @@ table.grid th {
 }
 .stat-table tbody tr:hover { background: var(--bg); }
 .stat-doctor-name { text-align: left; font-weight: 500; }
+.stat-presence { background: var(--bg); font-weight: 600; color: var(--accent); }
 .empty-note { color: var(--ink-muted); font-size: 13px; padding: 20px 0; text-align: center; }

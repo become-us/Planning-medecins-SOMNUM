@@ -436,16 +436,21 @@ function renderStats() {
       <th>Médecin</th>
       ${state.sites.map(s => `<th><span class="legend-swatch" style="background:${s.color};vertical-align:middle;"></span>${escapeHtml(s.name)}</th>`).join("")}
       <th>Absences</th>
-      <th>Total</th>
+      <th>Total vacations</th>
+      <th>Présence (J)</th>
     </tr></thead>
     <tbody>`;
   for (const d of state.doctors) {
     const row = byDoctor[d.id] || {};
+    const vacationsHorsAbsence = state.sites.reduce((sum, s) => sum + (row[s.id] || 0), 0);
+    const presenceJ = vacationsHorsAbsence / 2;
+    const presenceDisplay = Number.isInteger(presenceJ) ? presenceJ + "J" : presenceJ.toFixed(1).replace(".", ",") + "J";
     html += `<tr>
       <td class="stat-doctor-name">${escapeHtml(d.name)}</td>
       ${state.sites.map(s => `<td>${row[s.id] || 0}</td>`).join("")}
       <td>${row._absence || 0}</td>
       <td><strong>${row._total || 0}</strong></td>
+      <td class="stat-presence"><strong>${presenceDisplay}</strong></td>
     </tr>`;
   }
   html += `</tbody></table></div>`;
