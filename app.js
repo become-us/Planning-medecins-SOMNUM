@@ -418,17 +418,32 @@ function renderStats() {
     byDoctor[vac.doctor_id]._total++;
   }
 
-  let html = `<div class="stat-section-title">Vacations par site <span class="stat-note">(1 vacation = 0,5J)</span></div><div class="stat-row">`;
-  for (const site of state.sites) {
-    html += `<div class="stat-card">
-      <p class="stat-label"><span class="legend-swatch" style="background:${site.color}"></span>${escapeHtml(site.name)}</p>
-      <p class="stat-value">${bySite[site.id]}</p>
-    </div>`;
+  // Helper affichage jours
+  function fmtJ(n) {
+    const j = n / 2;
+    return Number.isInteger(j) ? j + "J" : j.toFixed(1).replace(".", ",") + "J";
   }
-  html += `<div class="stat-card">
-    <p class="stat-label"><span class="legend-swatch" style="background:#14181c"></span>Absences</p>
-    <p class="stat-value">${absenceCount}</p>
-  </div></div>`;
+
+  let html = `<div class="stat-section-title">Vacations par site <span class="stat-note">(1 vacation = 0,5J)</span></div>`;
+  html += `<div class="stat-table-wrap"><table class="stat-table">
+    <thead><tr>
+      <th></th>
+      ${state.sites.map(s => `<th><span class="legend-swatch" style="background:${s.color};vertical-align:middle;"></span>${escapeHtml(s.name)}</th>`).join("")}
+      <th><span class="legend-swatch" style="background:#14181c;vertical-align:middle;"></span>Absences</th>
+    </tr></thead>
+    <tbody>
+    <tr>
+      <td class="stat-doctor-name">Vacations</td>
+      ${state.sites.map(s => `<td>${bySite[s.id]}</td>`).join("")}
+      <td>${absenceCount}</td>
+    </tr>
+    <tr class="stat-presence-row">
+      <td class="stat-doctor-name">Présence médecin</td>
+      ${state.sites.map(s => `<td class="stat-presence">${fmtJ(bySite[s.id])}</td>`).join("")}
+      <td class="stat-presence">—</td>
+    </tr>
+    </tbody>
+  </table></div>`;
 
   html += `<div class="stat-section-title" style="margin-top:24px;">Vacations par médecin <span class="stat-note">(1 vacation = 0,5J)</span></div>`;
   html += `<div class="stat-table-wrap"><table class="stat-table">
@@ -443,8 +458,7 @@ function renderStats() {
   for (const d of state.doctors) {
     const row = byDoctor[d.id] || {};
     const vacationsHorsAbsence = state.sites.reduce((sum, s) => sum + (row[s.id] || 0), 0);
-    const presenceJ = vacationsHorsAbsence / 2;
-    const presenceDisplay = Number.isInteger(presenceJ) ? presenceJ + "J" : presenceJ.toFixed(1).replace(".", ",") + "J";
+    const presenceDisplay = fmtJ(vacationsHorsAbsence);
     html += `<tr>
       <td class="stat-doctor-name">${escapeHtml(d.name)}</td>
       ${state.sites.map(s => `<td>${row[s.id] || 0}</td>`).join("")}
