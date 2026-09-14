@@ -649,6 +649,15 @@ function exportGridPDF() {
 function exportSitesPDF() {
   if (state.sites.length === 0) { alert("Aucun site configuré."); return; }
 
+  // DEBUG temporaire
+  let debugInfo = `Vacations chargées: ${state.vacations.length}\nMédecins: ${state.doctors.length}\nSites: ${state.sites.length}\n\n`;
+  for (const site of state.sites) {
+    const count = state.vacations.filter(v => v.site_id === site.id && !v.is_absence).length;
+    debugInfo += `${site.name}: ${count} vacation(s)\n`;
+  }
+  alert(debugInfo);
+  return;
+
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: "landscape" });
   const nDays = daysInMonth(state.year, state.month);
