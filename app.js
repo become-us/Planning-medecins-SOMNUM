@@ -666,6 +666,14 @@ function exportSitesPDF() {
   for (const site of state.sites) {
     const rgb = hexToRgb(site.color);
 
+    // Filtre AVANT de créer la page : uniquement médecins avec vacation sur ce site
+    const doctorsForSite = doctors.filter(d =>
+      state.vacations.some(v => v.doctor_id === d.id && v.site_id === site.id && !v.is_absence)
+    );
+
+    // Si aucun médecin pour ce site ce mois-ci, on ignore complètement ce site
+    if (doctorsForSite.length === 0) continue;
+
     if (!firstPage) doc.addPage();
     firstPage = false;
 
@@ -678,21 +686,6 @@ function exportSitesPDF() {
     doc.text(`${site.name}  —  Planning SOMNUM  —  ${monthLabel}`, 14, 12);
     doc.setTextColor(0, 0, 0);
     doc.setFont(undefined, "normal");
-
-    // Tableau : uniquement les médecins ayant au moins une vacation sur ce site
-    const doctorsForSite = doctors.filter(d =>
-      state.vacations.some(v => v.doctor_id === d.id && v.site_id === site.id && !v.is_absence)
-    );
-
-    if (doctorsForSite.length === 0) {
-      // Pas de médecin pour ce site ce mois-ci, on saute la page
-      if (!firstPage) { /* on a déjà ajouté la page, on met juste une note */ }
-      doc.setFontSize(10);
-      doc.setTextColor(120, 120, 120);
-      doc.text("Aucun médecin affecté à ce site ce mois-ci.", 14, 30);
-      doc.setTextColor(0, 0, 0);
-      continue;
-    }
 
     const head = [["Médecin", ...Array.from({ length: nDays }, (_, i) => String(i + 1))]];
 
