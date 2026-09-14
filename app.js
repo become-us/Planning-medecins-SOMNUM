@@ -679,10 +679,24 @@ function exportSitesPDF() {
     doc.setTextColor(0, 0, 0);
     doc.setFont(undefined, "normal");
 
-    // Tableau : une ligne par médecin, une colonne par jour
+    // Tableau : uniquement les médecins ayant au moins une vacation sur ce site
+    const doctorsForSite = doctors.filter(d =>
+      state.vacations.some(v => v.doctor_id === d.id && v.site_id === site.id && !v.is_absence)
+    );
+
+    if (doctorsForSite.length === 0) {
+      // Pas de médecin pour ce site ce mois-ci, on saute la page
+      if (!firstPage) { /* on a déjà ajouté la page, on met juste une note */ }
+      doc.setFontSize(10);
+      doc.setTextColor(120, 120, 120);
+      doc.text("Aucun médecin affecté à ce site ce mois-ci.", 14, 30);
+      doc.setTextColor(0, 0, 0);
+      continue;
+    }
+
     const head = [["Médecin", ...Array.from({ length: nDays }, (_, i) => String(i + 1))]];
 
-    const body = doctors.map(doctor => {
+    const body = doctorsForSite.map(doctor => {
       const row = [doctor.name];
       for (let day = 1; day <= nDays; day++) {
         const date = isoDate(state.year, state.month, day);
@@ -709,7 +723,7 @@ function exportSitesPDF() {
       didParseCell: function(data) {
         if (data.section !== "body" || data.column.index === 0) return;
         const day = data.column.index;
-        const doctor = doctors[data.row.index];
+        const doctor = doctorsForSite[data.row.index];
         if (!doctor) return;
         const date = isoDate(state.year, state.month, day);
         const matin = findVacation(doctor.id, date, "matin");
