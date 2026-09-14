@@ -648,90 +648,79 @@ function exportGridPDF() {
 // ---------- Export PDF par site ----------
 function exportSitesPDF() {
   if (state.sites.length === 0) { alert("Aucun site configuré."); return; }
-
-  // DEBUG temporaire
-  let debugInfo = `Vacations chargées: ${state.vacations.length}\nMédecins: ${state.doctors.length}\nSites: ${state.sites.length}\n\n`;
-  for (const site of state.sites) {
-    const count = state.vacations.filter(v => v.site_id === site.id && !v.is_absence).length;
-    debugInfo += `${site.name}: ${count} vacation(s)\n`;
-  }
-  alert(debugInfo);
-  return;
+  if (state.vacations.length === 0) { alert("Aucune vacation enregistrée ce mois-ci."); return; }
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: "landscape" });
   const nDays = daysInMonth(state.year, state.month);
-  const monthLabel = `${MONTH_NAMES[state.month]} ${state.year}`;
-
-  // Médecins à inclure (sélection ou tous)
-  const query = (document.getElementById("search-input").value || "").toLowerCase().trim();
-  const filtered = state.doctors.filter(d => d.name.toLowerCase().includes(query));
-  const doctors = state.selectedDoctors.size > 0
-    ? filtered.filter(d => state.selectedDoctors.has(d.id))
-    : filtered;
-
+  const monthLabel = MONTH_NAMES[state.month] + " " + state.year;
   let firstPage = true;
 
-  for (const site of state.sites) {
+  for (let si = 0; si < state.sites.length; si++) {
+    const site = state.sites[si];
     const rgb = hexToRgb(site.color);
 
-    // Filtre AVANT de créer la page : uniquement médecins avec vacation sur ce site
-    const doctorsForSite = doctors.filter(d =>
-      state.vacations.some(v => v.doctor_id === d.id && v.site_id === site.id && !v.is_absence)
-    );
+    // Médecins ayant AU MOINS UNE vacation sur ce site ce mois-ci
+    const doctorsForSite = state.doctors.filter(function(d) {
+      return state.vacations.some(function(v) {
+        return v.doctor_id === d.id && v.site_id === site.id && v.is_absence === false;
+      });
+    });
 
-    // Si aucun médecin pour ce site ce mois-ci, on ignore complètement ce site
     if (doctorsForSite.length === 0) continue;
 
     if (!firstPage) doc.addPage();
     firstPage = false;
 
-    // En-tête de page
+    // En-tête coloré
     doc.setFillColor(rgb[0], rgb[1], rgb[2]);
     doc.rect(0, 0, doc.internal.pageSize.getWidth(), 18, "F");
     doc.setFontSize(13);
     doc.setFont(undefined, "bold");
     doc.setTextColor(255, 255, 255);
-    doc.text(`${site.name}  —  Planning SOMNUM  —  ${monthLabel}`, 14, 12);
+    doc.text(site.name + "  —  Planning SOMNUM  —  " + monthLabel, 14, 12);
     doc.setTextColor(0, 0, 0);
     doc.setFont(undefined, "normal");
 
-    const head = [["Médecin", ...Array.from({ length: nDays }, (_, i) => String(i + 1))]];
+    // Construction du tableau
+    var head = [["Médecin"].concat(Array.from({ length: nDays }, function(_, i) { return String(i + 1); }))];
+    var body = [];
 
-    const body = doctorsForSite.map(doctor => {
-      const row = [doctor.name];
+    for (let di = 0; di < doctorsForSite.length; di++) {
+      var doctor = doctorsForSite[di];
+      var row = [doctor.name];
       for (let day = 1; day <= nDays; day++) {
-        const date = isoDate(state.year, state.month, day);
-        const matin = findVacation(doctor.id, date, "matin");
-        const aprem = findVacation(doctor.id, date, "apres-midi");
-        // On n'affiche que les vacations sur CE site
-        const hasMatin = matin && !matin.is_absence && matin.site_id === site.id;
-        const hasAprem = aprem && !aprem.is_absence && aprem.site_id === site.id;
-        let cell = "";
+        var date = isoDate(state.year, state.month, day);
+        var matin = findVacation(doctor.id, date, "matin");
+        var aprem = findVacation(doctor.id, date, "apres-midi");
+        var hasMatin = matin && matin.is_absence === false && matin.site_id === site.id;
+        var hasAprem = aprem && aprem.is_absence === false && aprem.site_id === site.id;
+        var cell = "";
         if (hasMatin && hasAprem) cell = "M+AM";
         else if (hasMatin) cell = "M";
         else if (hasAprem) cell = "AM";
         row.push(cell);
       }
-      return row;
-    });
+      body.push(row);
+    }
 
     doc.autoTable({
-      head, body,
+      head: head,
+      body: body,
       startY: 22,
       styles: { fontSize: 6, cellPadding: 1, halign: "center", valign: "middle", minCellHeight: 8 },
       columnStyles: { 0: { halign: "left", cellWidth: 32, fontSize: 6 } },
       headStyles: { fillColor: [rgb[0], rgb[1], rgb[2]], textColor: [255, 255, 255], fontStyle: "bold" },
       didParseCell: function(data) {
         if (data.section !== "body" || data.column.index === 0) return;
-        const day = data.column.index;
-        const doctor = doctorsForSite[data.row.index];
+        var day = data.column.index;
+        var doctor = doctorsForSite[data.row.index];
         if (!doctor) return;
-        const date = isoDate(state.year, state.month, day);
-        const matin = findVacation(doctor.id, date, "matin");
-        const aprem = findVacation(doctor.id, date, "apres-midi");
-        const hasMatin = matin && !matin.is_absence && matin.site_id === site.id;
-        const hasAprem = aprem && !aprem.is_absence && aprem.site_id === site.id;
+        var date = isoDate(state.year, state.month, day);
+        var matin = findVacation(doctor.id, date, "matin");
+        var aprem = findVacation(doctor.id, date, "apres-midi");
+        var hasMatin = matin && matin.is_absence === false && matin.site_id === site.id;
+        var hasAprem = aprem && aprem.is_absence === false && aprem.site_id === site.id;
         if (hasMatin || hasAprem) {
           data.cell.styles.fillColor = [rgb[0], rgb[1], rgb[2]];
           data.cell.styles.textColor = [255, 255, 255];
@@ -739,29 +728,24 @@ function exportSitesPDF() {
         } else if (isWeekend(state.year, state.month, day)) {
           data.cell.styles.fillColor = [235, 235, 235];
         }
-        // Absence sur un autre site → gris foncé
-        const anyVac = matin || aprem;
-        if (!hasMatin && !hasAprem && anyVac && anyVac.is_absence) {
-          data.cell.styles.fillColor = [20, 24, 28];
-          data.cell.styles.textColor = [255, 255, 255];
-        }
       }
     });
 
-    // Comptage pour ce site
-    const count = state.vacations.filter(v => v.site_id === site.id).length;
-    const presJ = fmtJ(count);
-    const summaryY = doc.lastAutoTable.finalY + 9;
+    // Résumé
+    var count = state.vacations.filter(function(v) { return v.site_id === site.id && v.is_absence === false; }).length;
+    var summaryY = doc.lastAutoTable.finalY + 9;
     doc.setFontSize(8);
     doc.setFont(undefined, "bold");
     doc.setTextColor(rgb[0], rgb[1], rgb[2]);
-    doc.text(`Total vacations : ${count}   |   Presence : ${presJ}`, 14, summaryY);
+    doc.text("Total vacations : " + count + "   |   Présence : " + fmtJ(count), 14, summaryY);
     doc.setTextColor(0, 0, 0);
     doc.setFont(undefined, "normal");
   }
 
-  doc.save(`planning-par-site-somnum-${state.year}-${pad(state.month + 1)}.pdf`);
+  if (firstPage) { alert("Aucune vacation trouvée pour les sites ce mois-ci."); return; }
+  doc.save("planning-par-site-somnum-" + state.year + "-" + pad(state.month + 1) + ".pdf");
 }
+
 
 // ---------- Init ----------
 document.addEventListener("DOMContentLoaded", () => {
