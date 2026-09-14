@@ -34,7 +34,8 @@ let state = {
   doctors: [],
   sites: [],
   vacations: [], // rows for the current month
-  activeCell: null // { doctorId, date, period }
+  activeCell: null, // { doctorId, date, period }
+  selectedDoctors: new Set() // ids cochés pour l'export
 };
 
 // ---------- Boot ----------
@@ -166,7 +167,9 @@ function renderGrid() {
   const nDays = daysInMonth(state.year, state.month);
 
   // header
-  let theadHtml = "<tr><th class='doctor-cell'>Médecin</th>";
+  let theadHtml = `<tr>
+    <th class="check-col"><input type="checkbox" id="check-all" title="Tout sélectionner" onchange="toggleAllDoctors(this.checked)" /></th>
+    <th class='doctor-cell'>Médecin</th>`;
   for (let day = 1; day <= nDays; day++) {
     const weekend = isWeekend(state.year, state.month, day);
     theadHtml += `<th class="day-col-head${weekend ? ' weekend-col' : ''}">${day}</th>`;
@@ -180,7 +183,10 @@ function renderGrid() {
     tbodyHtml = `<tr><td colspan="${nDays + 1}"><p class="empty-note">Aucun médecin ${state.isAdmin ? "— ajoutez-en un dans l'onglet Médecins" : "trouvé"}.</p></td></tr>`;
   }
   for (const doctor of doctors) {
-    tbodyHtml += `<tr><td class="doctor-cell"><p class="doctor-name">${escapeHtml(doctor.name)}</p><p class="doctor-meta">${escapeHtml(doctor.status || "")}</p></td>`;
+    const isChecked = state.selectedDoctors.has(doctor.id);
+    tbodyHtml += `<tr class="${isChecked ? 'row-selected' : ''}">
+      <td class="check-col"><input type="checkbox" class="doc-check" data-id="${doctor.id}" ${isChecked ? 'checked' : ''} onchange="toggleDoctor('${doctor.id}', this.checked)" /></td>
+      <td class="doctor-cell"><p class="doctor-name">${escapeHtml(doctor.name)}</p><p class="doctor-meta">${escapeHtml(doctor.status || "")}</p></td>`;
     for (let day = 1; day <= nDays; day++) {
       const date = isoDate(state.year, state.month, day);
       const weekend = isWeekend(state.year, state.month, day);
@@ -204,10 +210,50 @@ function renderGrid() {
   }
   legendHtml += `<div class="legend-item"><span class="legend-swatch" style="background:#14181c"></span>Absence</div>`;
   document.getElementById("legend").innerHTML = legendHtml;
+
+  // Met à jour l'état de la checkbox "tout sélectionner"
+  const checkAll = document.getElementById("check-all");
+  if (checkAll) {
+    const allIds = doctors.map(d => d.id);
+    checkAll.checked = allIds.length > 0 && allIds.every(id => state.selectedDoctors.has(id));
+    checkAll.indeterminate = !checkAll.checked && allIds.some(id => state.selectedDoctors.has(id));
+  }
+  // Met à jour le libellé du bouton export
+  const exportBtn = document.getElementById("export-btn");
+  if (exportBtn) {
+    const n = state.selectedDoctors.size;
+    exportBtn.textContent = n > 0 ? `Exporter en PDF (${n} sélectionné${n > 1 ? "s" : ""})` : "Exporter en PDF";
+  }
 }
 
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, s => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[s]));
+}
+
+function toggleDoctor(id, checked) {
+  if (checked) state.selectedDoctors.add(id);
+  else state.selectedDoctors.delete(id);
+  // Met à jour l'état visuel de la ligne
+  const row = document.querySelector(`input.doc-check[data-id="${id}"]`);
+  if (row) row.closest("tr").classList.toggle("row-selected", checked);
+  // Met à jour check-all
+  const query = (document.getElementById("search-input").value || "").toLowerCase().trim();
+  const doctors = state.doctors.filter(d => d.name.toLowerCase().includes(query));
+  const checkAll = document.getElementById("check-all");
+  if (checkAll) {
+    checkAll.checked = doctors.length > 0 && doctors.every(d => state.selectedDoctors.has(d.id));
+    checkAll.indeterminate = !checkAll.checked && doctors.some(d => state.selectedDoctors.has(d.id));
+  }
+}
+
+function toggleAllDoctors(checked) {
+  const query = (document.getElementById("search-input").value || "").toLowerCase().trim();
+  const doctors = state.doctors.filter(d => d.name.toLowerCase().includes(query));
+  for (const d of doctors) {
+    if (checked) state.selectedDoctors.add(d.id);
+    else state.selectedDoctors.delete(d.id);
+  }
+  renderGrid();
 }
 
 // ---------- Color picker ----------
@@ -483,7 +529,11 @@ function exportGridPDF() {
   const doc = new jsPDF({ orientation: "landscape" });
   const nDays = daysInMonth(state.year, state.month);
   const query = (document.getElementById("search-input").value || "").toLowerCase().trim();
-  const doctors = state.doctors.filter(d => d.name.toLowerCase().includes(query));
+  const filtered = state.doctors.filter(d => d.name.toLowerCase().includes(query));
+  // Si des cases sont cochées, n'exporter que ceux-là ; sinon tous
+  const doctors = state.selectedDoctors.size > 0
+    ? filtered.filter(d => state.selectedDoctors.has(d.id))
+    : filtered;
 
   doc.setFontSize(14);
   doc.setFont(undefined, "bold");
