@@ -645,6 +645,110 @@ function exportGridPDF() {
   doc.save(`planning-medecin-somnum-${state.year}-${pad(state.month + 1)}.pdf`);
 }
 
+// ---------- Export PDF par site ----------
+function exportSitesPDF() {
+  if (state.sites.length === 0) { alert("Aucun site configuré."); return; }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "landscape" });
+  const nDays = daysInMonth(state.year, state.month);
+  const monthLabel = `${MONTH_NAMES[state.month]} ${state.year}`;
+
+  // Médecins à inclure (sélection ou tous)
+  const query = (document.getElementById("search-input").value || "").toLowerCase().trim();
+  const filtered = state.doctors.filter(d => d.name.toLowerCase().includes(query));
+  const doctors = state.selectedDoctors.size > 0
+    ? filtered.filter(d => state.selectedDoctors.has(d.id))
+    : filtered;
+
+  let firstPage = true;
+
+  for (const site of state.sites) {
+    const rgb = hexToRgb(site.color);
+
+    if (!firstPage) doc.addPage();
+    firstPage = false;
+
+    // En-tête de page
+    doc.setFillColor(rgb[0], rgb[1], rgb[2]);
+    doc.rect(0, 0, doc.internal.pageSize.getWidth(), 18, "F");
+    doc.setFontSize(13);
+    doc.setFont(undefined, "bold");
+    doc.setTextColor(255, 255, 255);
+    doc.text(`${site.name}  —  Planning SOMNUM  —  ${monthLabel}`, 14, 12);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont(undefined, "normal");
+
+    // Tableau : une ligne par médecin, une colonne par jour
+    const head = [["Médecin", ...Array.from({ length: nDays }, (_, i) => String(i + 1))]];
+
+    const body = doctors.map(doctor => {
+      const row = [doctor.name];
+      for (let day = 1; day <= nDays; day++) {
+        const date = isoDate(state.year, state.month, day);
+        const matin = findVacation(doctor.id, date, "matin");
+        const aprem = findVacation(doctor.id, date, "apres-midi");
+        // On n'affiche que les vacations sur CE site
+        const hasMatin = matin && !matin.is_absence && matin.site_id === site.id;
+        const hasAprem = aprem && !aprem.is_absence && aprem.site_id === site.id;
+        let cell = "";
+        if (hasMatin && hasAprem) cell = "M+AM";
+        else if (hasMatin) cell = "M";
+        else if (hasAprem) cell = "AM";
+        row.push(cell);
+      }
+      return row;
+    });
+
+    doc.autoTable({
+      head, body,
+      startY: 22,
+      styles: { fontSize: 6, cellPadding: 1, halign: "center", valign: "middle", minCellHeight: 8 },
+      columnStyles: { 0: { halign: "left", cellWidth: 32, fontSize: 6 } },
+      headStyles: { fillColor: [rgb[0], rgb[1], rgb[2]], textColor: [255, 255, 255], fontStyle: "bold" },
+      didParseCell: function(data) {
+        if (data.section !== "body" || data.column.index === 0) return;
+        const day = data.column.index;
+        const doctor = doctors[data.row.index];
+        if (!doctor) return;
+        const date = isoDate(state.year, state.month, day);
+        const matin = findVacation(doctor.id, date, "matin");
+        const aprem = findVacation(doctor.id, date, "apres-midi");
+        const hasMatin = matin && !matin.is_absence && matin.site_id === site.id;
+        const hasAprem = aprem && !aprem.is_absence && aprem.site_id === site.id;
+        if (hasMatin || hasAprem) {
+          data.cell.styles.fillColor = [rgb[0], rgb[1], rgb[2]];
+          data.cell.styles.textColor = [255, 255, 255];
+          data.cell.styles.fontStyle = "bold";
+        } else if (isWeekend(state.year, state.month, day)) {
+          data.cell.styles.fillColor = [235, 235, 235];
+        }
+        // Absence sur un autre site → gris foncé
+        const anyVac = matin || aprem;
+        if (!hasMatin && !hasAprem && anyVac && anyVac.is_absence) {
+          data.cell.styles.fillColor = [20, 24, 28];
+          data.cell.styles.textColor = [255, 255, 255];
+        }
+      }
+    });
+
+    // Comptage pour ce site
+    const count = state.vacations.filter(v => v.site_id === site.id).length;
+    const presJ = fmtJ(count);
+    let summaryY = doc.lastAutoTable.finalY + 8;
+    doc.setFontSize(8);
+    doc.setFillColor(rgb[0], rgb[1], rgb[2]);
+    doc.roundedRect(14, summaryY - 5, 80, 7, 1, 1, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont(undefined, "bold");
+    doc.text(`Total vacations : ${count}   |   Présence : ${presJ}`, 17, summaryY);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont(undefined, "normal");
+  }
+
+  doc.save(`planning-par-site-somnum-${state.year}-${pad(state.month + 1)}.pdf`);
+}
+
 // ---------- Init ----------
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("access-code-input").addEventListener("keydown", (e) => {
