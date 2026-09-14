@@ -635,7 +635,7 @@ function exportGridPDF() {
   for (const item of items) {
     const rgb = hexToRgb(item.color);
     doc.setFillColor(rgb[0], rgb[1], rgb[2]);
-    doc.roundedRect(lx, legendY - 4.5, 6, 5, 1, 1, "F");
+    doc.rect(lx, legendY - 4.5, 6, 5, "F");
     doc.setTextColor(0, 0, 0);
     doc.text(item.name, lx + 8, legendY);
     lx += doc.getTextWidth(item.name) + 18;
@@ -735,13 +735,11 @@ function exportSitesPDF() {
     // Comptage pour ce site
     const count = state.vacations.filter(v => v.site_id === site.id).length;
     const presJ = fmtJ(count);
-    let summaryY = doc.lastAutoTable.finalY + 8;
+    const summaryY = doc.lastAutoTable.finalY + 9;
     doc.setFontSize(8);
-    doc.setFillColor(rgb[0], rgb[1], rgb[2]);
-    doc.roundedRect(14, summaryY - 5, 80, 7, 1, 1, "F");
-    doc.setTextColor(255, 255, 255);
     doc.setFont(undefined, "bold");
-    doc.text(`Total vacations : ${count}   |   Présence : ${presJ}`, 17, summaryY);
+    doc.setTextColor(rgb[0], rgb[1], rgb[2]);
+    doc.text(`Total vacations : ${count}   |   Presence : ${presJ}`, 14, summaryY);
     doc.setTextColor(0, 0, 0);
     doc.setFont(undefined, "normal");
   }
