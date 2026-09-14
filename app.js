@@ -439,6 +439,12 @@ async function deleteSite(id) {
   renderGrid();
 }
 
+// ---------- Helpers globaux ----------
+function fmtJ(n) {
+  const j = n / 2;
+  return Number.isInteger(j) ? j + "J" : j.toFixed(1).replace(".", ",") + "J";
+}
+
 // ---------- Stats ----------
 function renderStats() {
   const container = document.getElementById("stats-grid");
@@ -462,12 +468,6 @@ function renderStats() {
       byDoctor[vac.doctor_id][vac.site_id] = (byDoctor[vac.doctor_id][vac.site_id] || 0) + 1;
     }
     byDoctor[vac.doctor_id]._total++;
-  }
-
-  // Helper affichage jours
-  function fmtJ(n) {
-    const j = n / 2;
-    return Number.isInteger(j) ? j + "J" : j.toFixed(1).replace(".", ",") + "J";
   }
 
   let html = `<div class="stat-section-title">Vacations par site <span class="stat-note">(1 vacation = 0,5J)</span></div>`;
