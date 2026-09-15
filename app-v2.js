@@ -21,6 +21,11 @@ const PERIODS = [
   { key: "apres-midi", label: "Après-midi" }
 ];
 
+const SPECIAL_TYPES = [
+  { key: "congres",   label: "Congrès",   color: "#9e9e9e" },
+  { key: "formateur", label: "Formateur", color: "#616161" }
+];
+
 const MONTH_NAMES = [
   "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
   "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
@@ -156,7 +161,11 @@ function siteById(id) {
 
 function cellColor(vac) {
   if (!vac) return null;
-  if (vac.is_absence) return "#14181c";
+  if (vac.is_absence) {
+    if (vac.special_type === "congres")   return "#9e9e9e";
+    if (vac.special_type === "formateur") return "#616161";
+    return "#14181c";
+  }
   const site = siteById(vac.site_id);
   return site ? site.color : null;
 }
@@ -209,6 +218,9 @@ function renderGrid() {
     legendHtml += `<div class="legend-item"><span class="legend-swatch" style="background:${site.color}"></span>${escapeHtml(site.name)}</div>`;
   }
   legendHtml += `<div class="legend-item"><span class="legend-swatch" style="background:#14181c"></span>Absence</div>`;
+  for (const sp of SPECIAL_TYPES) {
+    legendHtml += `<div class="legend-item"><span class="legend-swatch" style="background:${sp.color}"></span>${escapeHtml(sp.label)}</div>`;
+  }
   document.getElementById("legend").innerHTML = legendHtml;
 
   // Met à jour l'état de la checkbox "tout sélectionner"
@@ -266,7 +278,10 @@ function openPicker(doctorId, date, period) {
   for (const site of state.sites) {
     optionsHtml += `<button class="color-option" onclick="setVacation('${site.id}', false)"><span class="color-dot" style="background:${site.color}"></span>${escapeHtml(site.name)}</button>`;
   }
-  optionsHtml += `<button class="color-option" onclick="setVacation(null, true)"><span class="color-dot" style="background:#14181c"></span>Absence</button>`;
+  optionsHtml += `<button class="color-option" onclick="setVacation(null, true, null)"><span class="color-dot" style="background:#14181c"></span>Absence</button>`;
+  for (const sp of SPECIAL_TYPES) {
+    optionsHtml += `<button class="color-option" onclick="setVacation(null, true, '${sp.key}')"><span class="color-dot" style="background:${sp.color}"></span>${escapeHtml(sp.label)}</button>`;
+  }
 
   const overlay = document.createElement("div");
   overlay.className = "overlay";
@@ -297,7 +312,7 @@ function formatDateFr(iso) {
   return `${d}/${m}/${y}`;
 }
 
-async function setVacation(siteId, isAbsence) {
+async function setVacation(siteId, isAbsence, specialType = null) {
   const { doctorId, date, period } = state.activeCell;
   const existing = findVacation(doctorId, date, period);
 
@@ -308,11 +323,11 @@ async function setVacation(siteId, isAbsence) {
     }
   } else if (existing) {
     await supabaseClient.from("vacations")
-      .update({ site_id: siteId, is_absence: isAbsence, updated_at: new Date().toISOString() })
+      .update({ site_id: siteId, is_absence: isAbsence, special_type: specialType, updated_at: new Date().toISOString() })
       .eq("id", existing.id);
   } else {
     await supabaseClient.from("vacations")
-      .insert({ doctor_id: doctorId, date, period, site_id: siteId, is_absence: isAbsence });
+      .insert({ doctor_id: doctorId, date, period, site_id: siteId, is_absence: isAbsence, special_type: specialType });
   }
 
   closePicker();
@@ -452,9 +467,14 @@ function renderStats() {
   const bySite = {};
   for (const site of state.sites) bySite[site.id] = 0;
   let absenceCount = 0;
+  let congresCount = 0;
+  let formateurCount = 0;
   for (const vac of state.vacations) {
-    if (vac.is_absence) absenceCount++;
-    else if (vac.site_id && bySite.hasOwnProperty(vac.site_id)) bySite[vac.site_id]++;
+    if (vac.is_absence) {
+      if (vac.special_type === "congres") congresCount++;
+      else if (vac.special_type === "formateur") formateurCount++;
+      else absenceCount++;
+    } else if (vac.site_id && bySite.hasOwnProperty(vac.site_id)) bySite[vac.site_id]++;
   }
 
   // Comptages par médecin : { doctorId: { siteId: count, absence: count } }
@@ -464,6 +484,7 @@ function renderStats() {
     if (!byDoctor[vac.doctor_id]) continue;
     if (vac.is_absence) {
       byDoctor[vac.doctor_id]._absence++;
+      // Ne pas compter dans _total les absences spéciales
     } else if (vac.site_id) {
       byDoctor[vac.doctor_id][vac.site_id] = (byDoctor[vac.doctor_id][vac.site_id] || 0) + 1;
     }
@@ -549,7 +570,11 @@ function exportGridPDF() {
       const aprem = findVacation(doctor.id, date, "apres-midi");
       const label = (v) => {
         if (!v) return "";
-        if (v.is_absence) return "ABS";
+        if (v.is_absence) {
+          if (v.special_type === "congres") return "CGR";
+          if (v.special_type === "formateur") return "FOR";
+          return "ABS";
+        }
         const site = siteById(v.site_id);
         return site ? site.name.slice(0, 3).toUpperCase() : "";
       };
@@ -631,7 +656,12 @@ function exportGridPDF() {
   doc.text("Légende :", 14, legendY);
   doc.setFont(undefined, "normal");
   let lx = 38;
-  const items = [...state.sites.map(s => ({ name: s.name, color: s.color })), { name: "Absence", color: "#14181c" }];
+  const items = [
+    ...state.sites.map(s => ({ name: s.name, color: s.color })),
+    { name: "Absence", color: "#14181c" },
+    { name: "Congrès", color: "#9e9e9e" },
+    { name: "Formateur", color: "#616161" }
+  ];
   for (const item of items) {
     const rgb = hexToRgb(item.color);
     doc.setFillColor(rgb[0], rgb[1], rgb[2]);
