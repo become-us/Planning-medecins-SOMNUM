@@ -279,9 +279,8 @@ function openPicker(doctorId, date, period) {
     optionsHtml += `<button class="color-option" onclick="setVacation('${site.id}', false)"><span class="color-dot" style="background:${site.color}"></span>${escapeHtml(site.name)}</button>`;
   }
   optionsHtml += `<button class="color-option" onclick="setVacation(null, true, null)"><span class="color-dot" style="background:#14181c"></span>Absence</button>`;
-  for (const sp of SPECIAL_TYPES) {
-    optionsHtml += `<button class="color-option" onclick="setVacation(null, true, '${sp.key}')"><span class="color-dot" style="background:${sp.color}"></span>${escapeHtml(sp.label)}</button>`;
-  }
+  optionsHtml += `<button class="color-option" onclick="setVacation(null,true,'congres')"><span class="color-dot" style="background:#9e9e9e"></span>Cong\u00e8s</button>`;
+  optionsHtml += `<button class="color-option" onclick="setVacation(null,true,'formateur')"><span class="color-dot" style="background:#616161"></span>Formateur</button>`;
 
   const overlay = document.createElement("div");
   overlay.className = "overlay";
